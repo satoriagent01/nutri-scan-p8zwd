@@ -1,14 +1,14 @@
 /**
  * OCR Module - Extracts nutrition information from text
- * Uses AI-powered OCR to extract nutrition data from product labels
+ * Simulates OCR by parsing structured nutrition data from text
  */
 
 /**
  * Extracts nutrition data from OCR text
- * @param {string} ocrText - The text extracted from the image
- * @returns {Object} - Extracted nutrition data
+ * @param {string} text - The OCR-extracted text from an image
+ * @returns {object} - Object with nutrition data and serving info
  */
-export function extractNutritionFromText(ocrText) {
+export function extractNutritionFromText(text) {
   const result = {
     energy: null,
     fat: null,
@@ -19,129 +19,75 @@ export function extractNutritionFromText(ocrText) {
     protein: null,
     salt: null,
     servingSize: null,
-    servingUnit: null
+    servingUnit: null,
+    per: null
   };
 
-  // Look for nutrition table patterns
-  const lines = ocrText.split('\n');
-  let inNutritionTable = false;
-  let currentServing = null;
-  let currentServingUnit = null;
-
-  // Keywords for nutrition in different languages
-  const energyKeywords = ['energie', 'énergie', 'energia', 'energy', 'calories', 'kcal', 'kj'];
-  const fatKeywords = ['fett', 'matières grasses', 'vetten', 'grassi', 'fat', 'gras'];
-  const saturatedFatKeywords = ['gesättigte', 'saturées', 'verzadigde', 'saturi', 'saturated', 'saturé'];
-  const carbKeywords = ['kohlenhydrate', 'glucides', 'koolhydraten', 'carboidrati', 'carbohydrates', 'carbohydrate'];
-  const sugarKeywords = ['zucker', 'sucre', 'suiker', 'zucchero', 'sugar', 'sucres', 'suikers'];
-  const fiberKeywords = ['ballaststoffe', 'fibres', 'vezels', 'fibre', 'fiber'];
-  const proteinKeywords = ['eiweiß', 'protéines', 'eiwitten', 'proteine', 'protein', 'proteína'];
-  const saltKeywords = ['salz', 'sel', 'zout', 'sale', 'salt', 'sodium'];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-    
-    // Check for serving size
-    const servingMatch = line.match(/(?:portion|serving|portie|1\s*melto|glas|ml|g)\s*[:\s]*\s*(\d+)\s*(ml|g|piece|stuk|melto|glas)?/i);
-    if (servingMatch) {
-      currentServing = parseInt(servingMatch[1]);
-      currentServingUnit = servingMatch[2] || 'g';
-    }
-
-    // Check for nutrition keywords
-    const lowerLine = line.toLowerCase();
-    
-    // Energy
-    if (energyKeywords.some(kw => lowerLine.includes(kw))) {
-      const energyMatch = line.match(/(\d+)\s*(?:kj|kcal)/i);
-      if (energyMatch) {
-        result.energy = {
-          kj: parseInt(energyMatch[1]),
-          kcal: parseInt(energyMatch[1]) * 0.239 // rough conversion
-        };
-      }
-    }
-
-    // Fat
-    if (fatKeywords.some(kw => lowerLine.includes(kw)) && !saturatedFatKeywords.some(kw => lowerLine.includes(kw))) {
-      const fatMatch = line.match(/(\d+(?:\.\d+)?)\s*g/i);
-      if (fatMatch) {
-        result.fat = parseFloat(fatMatch[1]);
-      }
-    }
-
-    // Saturated Fat
-    if (saturatedFatKeywords.some(kw => lowerLine.includes(kw))) {
-      const satFatMatch = line.match(/(\d+(?:\.\d+)?)\s*g/i);
-      if (satFatMatch) {
-        result.saturatedFat = parseFloat(satFatMatch[1]);
-      }
-    }
-
-    // Carbohydrates
-    if (carbKeywords.some(kw => lowerLine.includes(kw))) {
-      const carbMatch = line.match(/(\d+(?:\.\d+)?)\s*g/i);
-      if (carbMatch) {
-        result.carbohydrates = parseFloat(carbMatch[1]);
-      }
-    }
-
-    // Sugars
-    if (sugarKeywords.some(kw => lowerLine.includes(kw))) {
-      const sugarMatch = line.match(/(\d+(?:\.\d+)?)\s*g/i);
-      if (sugarMatch) {
-        result.sugars = parseFloat(sugarMatch[1]);
-      }
-    }
-
-    // Fiber
-    if (fiberKeywords.some(kw => lowerLine.includes(kw))) {
-      const fiberMatch = line.match(/(\d+(?:\.\d+)?)\s*g/i);
-      if (fiberMatch) {
-        result.fiber = parseFloat(fiberMatch[1]);
-      }
-    }
-
-    // Protein
-    if (proteinKeywords.some(kw => lowerLine.includes(kw))) {
-      const proteinMatch = line.match(/(\d+(?:\.\d+)?)\s*g/i);
-      if (proteinMatch) {
-        result.protein = parseFloat(proteinMatch[1]);
-      }
-    }
-
-    // Salt/Sodium
-    if (saltKeywords.some(kw => lowerLine.includes(kw))) {
-      const saltMatch = line.match(/(\d+(?:\.\d+)?)\s*g/i);
-      if (saltMatch) {
-        result.salt = parseFloat(saltMatch[1]);
-      }
-    }
+  // Detect language and parse accordingly
+  const lowerText = text.toLowerCase();
+  
+  // Check for nutrition table patterns
+  const hasNutritionKeywords = /nährwert|nutrition|nutritional|voedingswaarde|dichiarazione|nutrizione/i.test(lowerText);
+  
+  if (!hasNutritionKeywords) {
+    return result;
   }
 
-  // Set serving size if found
-  if (currentServing) {
-    result.servingSize = currentServing;
-    result.servingUnit = currentServingUnit;
+  // Extract serving size
+  const servingPatterns = [
+    /(?:per|pro|pour|per\s+100|per\s+100\s*ml|per\s+100\s*g|per\s+100\s*ml|per\s+100\s*g)\s*(?:100\s*(?:ml|g)|per\s*glass|per\s*serving|per\s*portion)/i,
+    /(?:100\s*(?:ml|g)|per\s*serving|per\s*portion)/i
+  ];
+
+  // Look for serving information
+  const servingMatch = text.match(/(?:per|pro|pour|per\s+100|per\s+100\s*ml|per\s+100\s*g|per\s+100\s*ml|per\s+100\s*g)\s*(\d+)\s*(ml|g|100\s*(?:ml|g))/i);
+  if (servingMatch) {
+    result.servingSize = parseInt(servingMatch[1]);
+    result.servingUnit = servingMatch[2];
+    result.per = servingMatch[0];
+  }
+
+  // Extract numeric values with units
+  const valuePatterns = [
+    { key: 'energy', patterns: [/energie|énergie|energy|energia/i] },
+    { key: 'fat', patterns: [/fett|matières grasses|vetten|grassi|fat/i] },
+    { key: 'saturatedFat', patterns: [/gesättigte|acides gras saturés|verzadigde vetzuren|grassi saturati|saturated/i] },
+    { key: 'carbohydrates', patterns: [/kohlenhydrate|glucides|koolhydraten|carbohydrati|carbohydrates|carboidrati/i] },
+    { key: 'sugars', patterns: [/zucker|sucres|suikers|zucchero|sugars|sucre/i] },
+    { key: 'fiber', patterns: [/ballaststoffe|fibres alimentaires|vezels|fibre|fiber/i] },
+    { key: 'protein', patterns: [/eiweiß|protéines|eiwitten|proteine|protein/i] },
+    { key: 'salt', patterns: [/salz|sel|zout|sale|salt/i] }
+  ];
+
+  // Parse each nutrition value
+  for (const { key, patterns } of valuePatterns) {
+    for (const pattern of patterns) {
+      const match = text.match(pattern);
+      if (match) {
+        // Look for the value after the keyword
+        const keywordIndex = match.index;
+        const textAfter = text.substring(keywordIndex);
+        
+        // Try to find a number followed by g or kJ or kcal
+        const valueMatch = textAfter.match(/(\d+(?:\.\d+)?)\s*(?:g|kJ|kcal)/);
+        if (valueMatch) {
+          result[key] = parseFloat(valueMatch[1]);
+          break;
+        }
+      }
+    }
   }
 
   return result;
 }
 
 /**
- * Simulates OCR text extraction from an image
- * In a real implementation, this would call an OCR API
- * @param {string} imagePath - Path to the image file
- * @returns {Promise<string>} - Extracted text
+ * Extracts all text from an image (simulated)
+ * @param {string} imageData - Base64 encoded image data or file path
+ * @returns {string} - Extracted text
  */
-export async function extractText(imagePath) {
-  // Simulate OCR processing
-  // In a real implementation, this would call an OCR API like Tesseract or Google Vision
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      // Return simulated OCR text based on image path
-      // This would be replaced with actual OCR in production
-      resolve('Simulated OCR text');
-    }, 100);
-  });
+export function extractText(imageData) {
+  // In a real implementation, this would call an OCR API
+  // For now, return a placeholder
+  return '';
 }
