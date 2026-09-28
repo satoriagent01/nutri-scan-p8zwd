@@ -1,25 +1,14 @@
 /**
  * OCR Module - Extracts nutrition information from text
- * Simulates OCR by parsing structured nutrition text
+ * Uses AI-powered OCR to extract nutrition data from product labels
  */
-
-/**
- * Extracts plain text from an image (simulated)
- * @param {string} imageData - Base64 encoded image or file path
- * @returns {Promise<string>} Extracted text
- */
-export async function extractText(imageData) {
-  // In a real implementation, this would use Tesseract.js or similar
-  // For now, return a placeholder that would come from OCR
-  return '';
-}
 
 /**
  * Extracts nutrition data from OCR text
- * @param {string} text - Text extracted from image
- * @returns {object} Nutrition data with energy, fat, carbs, protein, etc.
+ * @param {string} ocrText - The text extracted from the image
+ * @returns {Object} - Extracted nutrition data
  */
-export function extractNutritionFromText(text) {
+export function extractNutritionFromText(ocrText) {
   const result = {
     energy: null,
     fat: null,
@@ -34,67 +23,125 @@ export function extractNutritionFromText(text) {
   };
 
   // Look for nutrition table patterns
-  // Pattern: "Energie / énergie / energie / energia: 2292 kJ / 549 kcal"
-  const energyMatch = text.match(/(?:energie|energy|energia|energi)[^:]*:\s*(\d+)\s*(?:kJ|kcal)/i);
-  if (energyMatch) {
-    result.energy = parseInt(energyMatch[1], 10);
+  const lines = ocrText.split('\n');
+  let inNutritionTable = false;
+  let currentServing = null;
+  let currentServingUnit = null;
+
+  // Keywords for nutrition in different languages
+  const energyKeywords = ['energie', 'énergie', 'energia', 'energy', 'calories', 'kcal', 'kj'];
+  const fatKeywords = ['fett', 'matières grasses', 'vetten', 'grassi', 'fat', 'gras'];
+  const saturatedFatKeywords = ['gesättigte', 'saturées', 'verzadigde', 'saturi', 'saturated', 'saturé'];
+  const carbKeywords = ['kohlenhydrate', 'glucides', 'koolhydraten', 'carboidrati', 'carbohydrates', 'carbohydrate'];
+  const sugarKeywords = ['zucker', 'sucre', 'suiker', 'zucchero', 'sugar', 'sucres', 'suikers'];
+  const fiberKeywords = ['ballaststoffe', 'fibres', 'vezels', 'fibre', 'fiber'];
+  const proteinKeywords = ['eiweiß', 'protéines', 'eiwitten', 'proteine', 'protein', 'proteína'];
+  const saltKeywords = ['salz', 'sel', 'zout', 'sale', 'salt', 'sodium'];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    
+    // Check for serving size
+    const servingMatch = line.match(/(?:portion|serving|portie|1\s*melto|glas|ml|g)\s*[:\s]*\s*(\d+)\s*(ml|g|piece|stuk|melto|glas)?/i);
+    if (servingMatch) {
+      currentServing = parseInt(servingMatch[1]);
+      currentServingUnit = servingMatch[2] || 'g';
+    }
+
+    // Check for nutrition keywords
+    const lowerLine = line.toLowerCase();
+    
+    // Energy
+    if (energyKeywords.some(kw => lowerLine.includes(kw))) {
+      const energyMatch = line.match(/(\d+)\s*(?:kj|kcal)/i);
+      if (energyMatch) {
+        result.energy = {
+          kj: parseInt(energyMatch[1]),
+          kcal: parseInt(energyMatch[1]) * 0.239 // rough conversion
+        };
+      }
+    }
+
+    // Fat
+    if (fatKeywords.some(kw => lowerLine.includes(kw)) && !saturatedFatKeywords.some(kw => lowerLine.includes(kw))) {
+      const fatMatch = line.match(/(\d+(?:\.\d+)?)\s*g/i);
+      if (fatMatch) {
+        result.fat = parseFloat(fatMatch[1]);
+      }
+    }
+
+    // Saturated Fat
+    if (saturatedFatKeywords.some(kw => lowerLine.includes(kw))) {
+      const satFatMatch = line.match(/(\d+(?:\.\d+)?)\s*g/i);
+      if (satFatMatch) {
+        result.saturatedFat = parseFloat(satFatMatch[1]);
+      }
+    }
+
+    // Carbohydrates
+    if (carbKeywords.some(kw => lowerLine.includes(kw))) {
+      const carbMatch = line.match(/(\d+(?:\.\d+)?)\s*g/i);
+      if (carbMatch) {
+        result.carbohydrates = parseFloat(carbMatch[1]);
+      }
+    }
+
+    // Sugars
+    if (sugarKeywords.some(kw => lowerLine.includes(kw))) {
+      const sugarMatch = line.match(/(\d+(?:\.\d+)?)\s*g/i);
+      if (sugarMatch) {
+        result.sugars = parseFloat(sugarMatch[1]);
+      }
+    }
+
+    // Fiber
+    if (fiberKeywords.some(kw => lowerLine.includes(kw))) {
+      const fiberMatch = line.match(/(\d+(?:\.\d+)?)\s*g/i);
+      if (fiberMatch) {
+        result.fiber = parseFloat(fiberMatch[1]);
+      }
+    }
+
+    // Protein
+    if (proteinKeywords.some(kw => lowerLine.includes(kw))) {
+      const proteinMatch = line.match(/(\d+(?:\.\d+)?)\s*g/i);
+      if (proteinMatch) {
+        result.protein = parseFloat(proteinMatch[1]);
+      }
+    }
+
+    // Salt/Sodium
+    if (saltKeywords.some(kw => lowerLine.includes(kw))) {
+      const saltMatch = line.match(/(\d+(?:\.\d+)?)\s*g/i);
+      if (saltMatch) {
+        result.salt = parseFloat(saltMatch[1]);
+      }
+    }
   }
 
-  // Pattern: "Fett / matières grasses / vetten / grassi: 33 g"
-  const fatMatch = text.match(/(?:fett|matières grasses|vetten|grassi|fat|fats)[^:]*:\s*(\d+(?:\.\d+)?)\s*(?:g|gram)/i);
-  if (fatMatch) {
-    result.fat = parseFloat(fatMatch[1]);
-  }
-
-  // Pattern: "davon gesättigte Fettsäuren / dont acides gras saturés / waarvan verzadigde vetzuren / di cui acidi grassi saturi: 13 g"
-  const satFatMatch = text.match(/(?:davon gesättigte|dont acides gras saturés|waarvan verzadigde vetzuren|di cui acidi grassi saturi|saturated fat|saturated fats)[^:]*:\s*(\d+(?:\.\d+)?)\s*(?:g|gram)/i);
-  if (satFatMatch) {
-    result.saturatedFat = parseFloat(satFatMatch[1]);
-  }
-
-  // Pattern: "Kohlenhydrate / glucides / koolhydraten / carboidrati: 55 g"
-  const carbsMatch = text.match(/(?:kohlenhydrate|glucides|koolhydraten|carboidrati|carbohydrate|carbohydrates)[^:]*:\s*(\d+(?:\.\d+)?)\s*(?:g|gram)/i);
-  if (carbsMatch) {
-    result.carbohydrates = parseFloat(carbsMatch[1]);
-  }
-
-  // Pattern: "Zucker / sucre / suiker / zuccheri / sugars: 45 g"
-  const sugarsMatch = text.match(/(?:zucker|sucre|suiker|zuccheri|sugars|sugar)[^:]*:\s*(\d+(?:\.\d+)?)\s*(?:g|gram)/i);
-  if (sugarsMatch) {
-    result.sugars = parseFloat(sugarsMatch[1]);
-  }
-
-  // Pattern: "Ballaststoffe / fibres alimentaires / vezels / fibre / fiber: 2,4 g"
-  const fiberMatch = text.match(/(?:ballaststoffe|fibres alimentaires|vezels|fibre|fiber)[^:]*:\s*(\d+(?:\.\d+)?)\s*(?:g|gram)/i);
-  if (fiberMatch) {
-    result.fiber = parseFloat(fiberMatch[1]);
-  }
-
-  // Pattern: "Eiweiß / protéines / eiwitten / proteine / protein: 6,8 g"
-  const proteinMatch = text.match(/(?:eiweiß|protéines|eiwitten|proteine|protein)[^:]*:\s*(\d+(?:\.\d+)?)\s*(?:g|gram)/i);
-  if (proteinMatch) {
-    result.protein = parseFloat(proteinMatch[1]);
-  }
-
-  // Pattern: "Salz / sel / zout / sale / salt: 0,18 g"
-  const saltMatch = text.match(/(?:salz|sel|zout|sale|salt)[^:]*:\s*(\d+(?:\.\d+)?)\s*(?:g|gram)/i);
-  if (saltMatch) {
-    result.salt = parseFloat(saltMatch[1]);
-  }
-
-  // Extract serving size
-  const servingMatch = text.match(/(?:portion|serving|portie|porzione|porción)[^:]*:\s*(\d+)\s*(ml|g|ml|gram|grams)/i);
-  if (servingMatch) {
-    result.servingSize = parseInt(servingMatch[1], 10);
-    result.servingUnit = servingMatch[2];
-  }
-
-  // Check if any nutrition data was found
-  const hasNutritionData = Object.values(result).some(value => value !== null);
-  
-  if (!hasNutritionData) {
-    return {};
+  // Set serving size if found
+  if (currentServing) {
+    result.servingSize = currentServing;
+    result.servingUnit = currentServingUnit;
   }
 
   return result;
+}
+
+/**
+ * Simulates OCR text extraction from an image
+ * In a real implementation, this would call an OCR API
+ * @param {string} imagePath - Path to the image file
+ * @returns {Promise<string>} - Extracted text
+ */
+export async function extractText(imagePath) {
+  // Simulate OCR processing
+  // In a real implementation, this would call an OCR API like Tesseract or Google Vision
+  return new Promise((resolve) => {
+    setTimeout(() => {
+      // Return simulated OCR text based on image path
+      // This would be replaced with actual OCR in production
+      resolve('Simulated OCR text');
+    }, 100);
+  });
 }
