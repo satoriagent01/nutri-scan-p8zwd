@@ -1,14 +1,28 @@
 /**
  * OCR Module - Extracts nutrition information from text
- * Simulates OCR extraction from images of nutrition labels
+ * Simulates OCR by parsing structured nutrition text
  */
 
 /**
- * Extracts nutrition data from OCR text
- * @param {string} ocrText - The text extracted from the image
- * @returns {Object} - Extracted nutrition data
+ * Extracts plain text from an image (simulated)
+ * @param {string} imageData - Base64 encoded image or text representation
+ * @returns {string} Extracted text
  */
-export function extractNutritionFromText(ocrText) {
+export function extractText(imageData) {
+  // In a real implementation, this would call an OCR API
+  // For now, if imageData is already text, return it
+  if (typeof imageData === 'string' && !imageData.startsWith('data:')) {
+    return imageData;
+  }
+  return '';
+}
+
+/**
+ * Extracts nutrition information from text
+ * @param {string} text - Text containing nutrition information
+ * @returns {Object} Extracted nutrition data
+ */
+export function extractNutritionFromText(text) {
   const result = {
     energy: null,
     fat: null,
@@ -23,79 +37,68 @@ export function extractNutritionFromText(ocrText) {
   };
 
   // Look for nutrition table patterns
-  const lines = ocrText.split('\n');
-  
-  // Try to find serving size
-  const servingMatch = ocrText.match(/(?:serving|portie|portion|servizio|porzione)\s*(?:size|size|size|dimensione)?[:\s]*\s*(\d+(?:\.\d+)?)\s*(g|ml|kg|l|oz|lb|porzioni|porciones|porzioni)/i);
+  // Pattern: "Energie / énergie / energie / energia: 2292 kJ / 549 kcal"
+  const energyMatch = text.match(/(?:Energie|énergie|energia|energy)\s*[:\-]?\s*(\d+)\s*(?:kJ|kcal)/i);
+  if (energyMatch) {
+    result.energy = parseInt(energyMatch[1], 10);
+  }
+
+  // Pattern: "Fett / matières grasses / vetten / grassi: 33 g"
+  const fatMatch = text.match(/(?:Fett|matières grasses|vetten|grassi|fat)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:g|gram)/i);
+  if (fatMatch) {
+    result.fat = parseFloat(fatMatch[1]);
+  }
+
+  // Pattern: "davon gesättigte Fettsäuren / dont acides gras saturés / waarvan verzadigde vetzuren / di cui acidi grassi saturi: 13 g"
+  const satFatMatch = text.match(/(?:davon gesättigte|dont acides gras saturés|waarvan verzadigde vetzuren|di cui acidi grassi saturi|saturated fat)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:g|gram)/i);
+  if (satFatMatch) {
+    result.saturatedFat = parseFloat(satFatMatch[1]);
+  }
+
+  // Pattern: "Kohlenhydrate / glucides / koolhydraten / carboidrati: 55 g"
+  const carbMatch = text.match(/(?:Kohlenhydrate|glucides|koolhydraten|carboidrati|carbohydrates|carbs)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:g|gram)/i);
+  if (carbMatch) {
+    result.carbohydrates = parseFloat(carbMatch[1]);
+  }
+
+  // Pattern: "Zucker / sucre / suiker / zuccheri / sugars: 45 g"
+  const sugarMatch = text.match(/(?:Zucker|sucre|suiker|zuccheri|sugars)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:g|gram)/i);
+  if (sugarMatch) {
+    result.sugars = parseFloat(sugarMatch[1]);
+  }
+
+  // Pattern: "Ballaststoffe / fibres alimentaires / vezels / fibre / fiber: 2,4 g"
+  const fiberMatch = text.match(/(?:Ballaststoffe|fibres alimentaires|vezels|fibre|fiber)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:g|gram)/i);
+  if (fiberMatch) {
+    result.fiber = parseFloat(fiberMatch[1]);
+  }
+
+  // Pattern: "Eiweiß / protéines / eiwitten / proteine / protein: 6,8 g"
+  const proteinMatch = text.match(/(?:Eiweiß|protéines|eiwitten|proteine|protein)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:g|gram)/i);
+  if (proteinMatch) {
+    result.protein = parseFloat(proteinMatch[1]);
+  }
+
+  // Pattern: "Salz / sel / zout / sale / salt: 0,18 g"
+  const saltMatch = text.match(/(?:Salz|sel|zout|sale|salt)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:g|gram)/i);
+  if (saltMatch) {
+    result.salt = parseFloat(saltMatch[1]);
+  }
+
+  // Extract serving size
+  // Pattern: "100 g", "30 g = 1 Melto", "200 ml", "per 100 ml"
+  const servingMatch = text.match(/(?:per|pro|por|pro|per)\s+(\d+(?:\.\d+)?)\s*(ml|g|gram|liter|L)/i);
   if (servingMatch) {
     result.servingSize = parseFloat(servingMatch[1]);
     result.servingUnit = servingMatch[2];
   }
 
-  // Look for nutrition values - try multiple languages
-  const nutritionPatterns = [
-    { key: 'energy', patterns: [/energi[ae]/i, /calories?/i, /kcal/i, /kj/i] },
-    { key: 'fat', patterns: [/fett/i, /matières grasses/i, /vetten/i, /grassi/i, /fat/i] },
-    { key: 'saturatedFat', patterns: [/gesättigte fettsäuren/i, /acides gras saturés/i, /verzadigde vetzuren/i, /acidi grassi saturi/i, /saturated fat/i] },
-    { key: 'carbohydrates', patterns: [/kohl(en|ä)nhydrate/i, /glucides/i, /koolhydraten/i, /carboidrati/i, /carbohydrates/i] },
-    { key: 'sugars', patterns: [/zucker/i, /sucres/i, /suikers/i, /zucchero/i, /sugars/i] },
-    { key: 'fiber', patterns: [/ballaststoffe/i, /fibres alimentaires/i, /vezels/i, /fibra/i, /fiber/i] },
-    { key: 'protein', patterns: [/eiweiß/i, /protéines/i, /eiwitten/i, /proteine/i, /protein/i] },
-    { key: 'salt', patterns: [/salz/i, /sel/i, /zout/i, /sale/i, /salt/i] }
-  ];
-
-  for (const line of lines) {
-    const trimmedLine = line.trim();
-    
-    for (const { key, patterns } of nutritionPatterns) {
-      for (const pattern of patterns) {
-        if (pattern.test(trimmedLine)) {
-          // Try to extract value - look for number followed by unit
-          const valueMatch = trimmedLine.match(/(\d+(?:\.\d+)?)\s*(g|kj|kcal|mg|kg|l)/i);
-          if (valueMatch) {
-            const value = parseFloat(valueMatch[1]);
-            const unit = valueMatch[2].toLowerCase();
-            
-            if (key === 'energy') {
-              if (unit === 'kcal') {
-                result.energy = value;
-              } else if (unit === 'kj') {
-                // Convert kJ to kcal (1 kcal = 4.184 kJ)
-                result.energy = Math.round(value / 4.184);
-              }
-            } else if (unit === 'g' || unit === 'mg') {
-              if (unit === 'mg' && key !== 'energy') {
-                result[key] = value / 1000; // Convert mg to g
-              } else {
-                result[key] = value;
-              }
-            }
-          }
-          break;
-        }
-      }
-    }
+  // Check if we found any nutrition data
+  const hasNutritionData = Object.values(result).some(val => val !== null && val !== undefined);
+  
+  if (!hasNutritionData) {
+    return {};
   }
 
   return result;
-}
-
-/**
- * Simulates OCR text extraction from an image
- * @param {string} imagePath - Path to the image file
- * @returns {Promise<string>} - Extracted text
- */
-export async function extractText(imagePath) {
-  // In a real implementation, this would use an OCR library
-  // For now, return a simulated response
-  return `Nutrition Facts
-Serving Size: 100g
-Calories: 250
-Total Fat: 12g
-Saturated Fat: 5g
-Total Carbohydrates: 30g
-Dietary Fiber: 3g
-Sugars: 15g
-Protein: 8g
-Sodium: 200mg`;
 }
